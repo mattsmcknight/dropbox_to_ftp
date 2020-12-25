@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 
 from ftplib import FTP
-import fire
+from io import BytesIO
+import os
+import dropbox
+
 
 def send_to_ftp(filename, server, binary_file):
     with FTP() as ftp:
@@ -11,10 +14,35 @@ def send_to_ftp(filename, server, binary_file):
         ftp.login()
         ftp.storbinary(f"STOR {filename}", binary_file)
 
+def idempotency(visited_files):
+    try:
+        os.stat("files.txt")
+    except FileNotFoundError:
+        with open('files.txt', 'a'):
+            pass
+    with open("files.txt", 'r') as read_files:
+        for line in read_files.readlines():
+            visited_files.add(line.strip())
+    with open("files.txt", 'w') as files:
+        for file_name in visited_files:
+            files.write(f"{file_name}\n")
+    return visited_files   
+
 def main():
-    
-    with open(filename, 'rb') as binary_file:
-        send_to_ftp(filename, server, binary_file)
+    with open('app_token.txt', 'r') as app_file:
+        app_token = app_file.readline()
+    app_token = app_token.strip()
+    visited_files = idempotency(set())
+    dbx = dropbox.Dropbox(app_token)
+    #print(dbx.users_get_current_account())
+    for entry in dbx.files_list_folder('').entries:
+        visited_files.add(entry.name)
+        meta, response = dbx.files_download(entry.path_lower)
+        binary_file = BytesIO(response.content)
+        send_to_ftp(entry.name, "192.168.1.97:2221", binary_file)
+    visited_files = idempotency(visited_files)
+
+    # send_to_ftp(filename, "192.168.1.97:2221", binary_file)
 
 if __name__ == "__main__":
-    #fire.Fire(main)
+    main()
