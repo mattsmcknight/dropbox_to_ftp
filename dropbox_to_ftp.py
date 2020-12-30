@@ -32,9 +32,7 @@ def main():
     with open('app_token.txt', 'r') as app_file:
         app_tokens = [ line.strip() for line in app_file.readlines()]
     visited_files = idempotency(set())
-    print(app_tokens)
     for app_token in app_tokens:
-        print(app_token)
         dbx = dropbox.Dropbox(app_token)
         #print(dbx.users_get_current_account())
         for entry in dbx.files_list_folder('').entries:
